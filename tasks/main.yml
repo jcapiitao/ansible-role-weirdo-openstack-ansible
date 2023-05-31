@@ -1,0 +1,84 @@
+---
+#   Copyright Red Hat, Inc. All Rights Reserved.
+#
+#   Licensed under the Apache License, Version 2.0 (the "License"); you may
+#   not use this file except in compliance with the License. You may obtain
+#   a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#   WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#   License for the specific language governing permissions and limitations
+#   under the License.
+#
+
+- name: Install required packages
+  package:
+    name: "{{ required_packages }}"
+    state: "latest"
+  retries: "3"
+  delay: "20"
+
+- name: set sysctl net.ipv6.conf.all.disable_ipv6  to 0
+  sysctl:
+    name: net.ipv6.conf.all.disable_ipv6
+    value: 0
+    state: present
+
+- name: set net.ipv6.conf.default.disable_ipv6 to 0
+  sysctl:
+    name: net.ipv6.conf.default.disable_ipv6
+    value: 0
+    state: present
+
+- block:
+    # Workaround for https://github.com/ansible/ansible-modules-core/issues/4431
+    - name: Clone upstream openstack-ansible repository
+      git:
+        repo: "{{ repository }}"
+        dest: "{{ clone_path }}"
+        version: "{{ version }}"
+        force: "yes"
+      when: refspec is not defined
+  rescue:
+    - name: Clone upstream openstack-ansible repository from master branch (fallback)
+      git:
+        repo: "{{ repository }}"
+        dest: "{{ clone_path }}"
+        version: "master"
+        force: "yes"
+      when: refspec is not defined
+
+- name: Clone openstack-ansible with a review in progress
+  git:
+    repo: "{{ repository }}"
+    dest: "{{ clone_path }}"
+    refspec: "{{ refspec }}"
+    version: "FETCH_HEAD"
+    force: "yes"
+  when: refspec is defined
+
+- name: Remove zuul cloner executable
+  file:
+    path: "/usr/zuul-env/bin/zuul-cloner"
+    state: absent
+
+- block:
+    - name: "Run openstack ansible test"
+      command: "./run_tests.sh"
+      args:
+        chdir: "{{ clone_path }}"
+      environment:
+        MANAGE_REPOS: "{{ manage_repos }}"
+        WORKSPACE: "{{ osa_workspace }}"
+  always:
+    - name: Recover openstack ansible integration test logs
+      command: "./copy_logs.sh"
+      environment:
+        WORKSPACE: "{{ osa_workspace }}"
+      args:
+        chdir: "{{ clone_path }}"
+        creates: "{{ osa_workspace }}/logs"
+      ignore_errors: true
