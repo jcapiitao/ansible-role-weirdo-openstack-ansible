@@ -20,4 +20,4 @@ manage_repos: "false"
 repository: "https://review.opendev.org/openstack/openstack-ansible"
 clone_path: "/tmp/openstack-ansible"
 osa_workspace: "/var/log/weirdo-project"
-required_packages:
+required_packages: []
