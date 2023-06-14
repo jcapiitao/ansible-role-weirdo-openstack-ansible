@@ -74,6 +74,7 @@
       environment:
         MANAGE_REPOS: "{{ manage_repos }}"
         WORKSPACE: "{{ osa_workspace }}"
+        PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
   always:
     - name: Recover openstack ansible integration test logs
       command: "./copy_logs.sh"
